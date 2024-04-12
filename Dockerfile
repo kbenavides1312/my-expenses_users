@@ -1,0 +1,14 @@
+# use official Golang image
+FROM golang:1.16.3-alpine3.13
+
+# set working directory
+WORKDIR /app/users
+
+# Copy the source code
+COPY ./users/users-api . 
+
+#EXPOSE the port
+EXPOSE 8000
+
+# Run the executable
+CMD ["./users-api"]
