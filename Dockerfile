@@ -5,7 +5,7 @@ FROM golang:1.16.3-alpine3.13
 WORKDIR /app/users
 
 # Copy the source code
-COPY ./users/users-api . 
+COPY ./src/users-api . 
 
 #EXPOSE the port
 EXPOSE 8000

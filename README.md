@@ -4,6 +4,7 @@ create development image
 ```
 docker build --file Dockerfile.dev --tag users-api:dev .
 ```
+
 start dev db
 ```
 docker run --rm \
@@ -28,7 +29,7 @@ docker run --rm -d \
 --name users-api-dev \
 -p 8080:8000 \
 -e DATABASE_URL="host=172.17.0.2 user=postgres password=postgres dbname=postgres sslmode=disable" \
--v "$PWD/users":/app/users \
+-v "$PWD/src":/app/users \
 -v "$PWD/dependencies/go":/go \
 users-api:dev
 ```
@@ -64,8 +65,6 @@ docker run --rm -d \
 --name users-api \
 -p 8080:8000 \
 -e DATABASE_URL="host=172.17.0.2 user=postgres password=postgres dbname=postgres sslmode=disable" \
--v "$PWD/users":/app/users \
--v "$PWD/dependencies/go":/go \
 users-api:local
 ```
 
