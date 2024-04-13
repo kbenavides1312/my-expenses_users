@@ -104,6 +104,8 @@ func createUser(db *sql.DB) http.HandlerFunc {
 			log.Fatal(err)
 		}
 
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		json.NewEncoder(w).Encode(u)
 	}
 }

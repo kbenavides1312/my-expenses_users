@@ -19,7 +19,7 @@ docker run --rm \
 
 inspect db ip
 ```
-docker inspect --format '{{ .NetworkSettings.IPAddress }}' go_db
+docker inspect --format='{{.Name}} - {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-db
 ```
 
 start development container (replace host ip by the one from previous step)
@@ -75,7 +75,7 @@ curl http://localhost:8080/api/users
 
 create an user
 ```
-curl -X POST http://localhost:8080/api/users \
+curl -X POST http://localhost:8084/api/users \
 --header 'Content-Type: application/json' \
 --data-raw '{"name": "aaa","email": "aaa@mail"}'
 ```
