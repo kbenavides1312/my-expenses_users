@@ -1,9 +1,24 @@
+FROM golang:1.22-alpine
 
-# development
+# Install dependencies (optional tools like git, bash)
+RUN apk add --no-cache git bash
 
-FROM golang:1.22-alpine3.19
+# Set working directory
+WORKDIR /app
 
-WORKDIR /app/users
+# Copy go.mod and go.sum first (better caching)
+COPY ./src/go.mod ./src/go.sum ./
+RUN go mod download
 
-ENTRYPOINT ["tail"]
-CMD ["-f","/dev/null"]
+# Copy source code (in dev, usually mounted instead of copied)
+COPY ./src .
+
+# Swagger docs
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+RUN swag init --output docs
+
+# Expose app port
+EXPOSE 8080
+
+# Run the app (default dev run)
+CMD ["go", "run", "."]

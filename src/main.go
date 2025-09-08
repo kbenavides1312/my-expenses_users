@@ -1,17 +1,24 @@
+// @title My Expenses Users API
+// @version 1.0
+// @description API for managing users in My Expenses app
+// @BasePath /api
+
 package main
 
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"time"
-	"fmt"
 	"os"
+	"time"
+	_ "main/docs"
 
-	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/mux"
+	"github.com/swaggo/http-swagger"
+	"golang.org/x/crypto/bcrypt"
 	_ "github.com/lib/pq"
 )
 
@@ -29,7 +36,7 @@ type UserPayload struct {
 }
 
 type LoginResponse struct {
-	User `json:"user"`
+	User  `json:"user"`
 	Token string `json:"token"`
 }
 
@@ -39,45 +46,45 @@ type UserDB struct {
 }
 
 func HashPassword(password string) (string, error) {
-    bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-    return string(bytes), err
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
 }
 
 func CheckPasswordHash(password, hash string) bool {
-    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-    return err == nil
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 
 func createToken(email string) (string, error) {
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, 
-        jwt.MapClaims{ 
-        "email": email, 
-        "exp": time.Now().Add(time.Minute * 10).Unix(), 
-        })
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"email": email,
+			"exp":   time.Now().Add(time.Minute * 10).Unix(),
+		})
 
-    tokenString, err := token.SignedString(secretKey)
-    if err != nil {
-    	return "", err
-    }
+	tokenString, err := token.SignedString(secretKey)
+	if err != nil {
+		return "", err
+	}
 
- return tokenString, nil
+	return tokenString, nil
 }
 
 func verifyToken(tokenString string) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-	   return secretKey, nil
+		return secretKey, nil
 	})
-   
+
 	if err != nil {
-	   return err
+		return err
 	}
-   
+
 	if !token.Valid {
-	   return fmt.Errorf("invalid token")
+		return fmt.Errorf("invalid token")
 	}
-   
+
 	return nil
- }
+}
 
 func main() {
 	//connect to database
@@ -103,9 +110,12 @@ func main() {
 	router.HandleFunc("/api/users/{id}", updateUser(db)).Methods("PUT")
 	router.HandleFunc("/api/users/{id}", deleteUser(db)).Methods("DELETE")
 
+	// Serve Swagger docs at /docs
+	router.PathPrefix("/docs/").Handler(httpSwagger.WrapHandler)
+
 	//start server
 	log.Print("listening...")
-	log.Fatal(http.ListenAndServe(":8000", corsMiddleware(jsonContentTypeMiddleware(router))))
+	log.Fatal(http.ListenAndServe(":8080", corsMiddleware(jsonContentTypeMiddleware(router))))
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
@@ -130,6 +140,11 @@ func jsonContentTypeMiddleware(next http.Handler) http.Handler {
 }
 
 // get all users
+// @Summary Get all users
+// @Tags users
+// @Produce json
+// @Success 200 {array} User
+// @Router /users [get]
 func getUsers(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query("SELECT id, name, email FROM users")
@@ -155,6 +170,13 @@ func getUsers(db *sql.DB) http.HandlerFunc {
 }
 
 // get user by id
+// @Summary Get user by ID
+// @Tags users
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} User
+// @Failure 404 {string} string "User not found"
+// @Router /users/{id} [get]
 func getUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -173,6 +195,14 @@ func getUser(db *sql.DB) http.HandlerFunc {
 }
 
 // create user
+// @Summary Create a new user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body UserPayload true "User payload"
+// @Success 200 {object} User
+// @Failure 400 {string} string "Bad request"
+// @Router /users [post]
 func createUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var up UserPayload
@@ -181,27 +211,37 @@ func createUser(db *sql.DB) http.HandlerFunc {
 		u.PwHash, _ = HashPassword(up.Password)
 		log.Printf("pw %v pwHash %v", up.Password, u.PwHash)
 
-		
 		err := db.QueryRow("INSERT INTO users (name, email, pwhash) VALUES ($1, $2, $3) RETURNING id", u.Name, u.Email, u.PwHash).Scan(&u.ID)
 		if err != nil {
 			log.Fatal(err)
 		}
-		
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+
+		// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		json.NewEncoder(w).Encode(u.User)
 	}
 }
 
 // update user
+// @Summary Update an existing user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param user body UserPayload true "User payload"
+// @Success 200 {object} User
+// @Failure 400 {string} string "Bad request"
+// @Failure 404 {string} string "User not found"
+// @Router /users/{id} [put]
 func updateUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var up UserPayload
 		json.NewDecoder(r.Body).Decode(&up)
-		
+
 		vars := mux.Vars(r)
 		id := vars["id"]
-		
+
 		u := UserDB{User: up.User}
 		u.PwHash, _ = HashPassword(up.Password)
 
@@ -215,6 +255,12 @@ func updateUser(db *sql.DB) http.HandlerFunc {
 }
 
 // delete user
+// @Summary Delete a user
+// @Tags users
+// @Param id path int true "User ID"
+// @Success 200 {string} string "User deleted"
+// @Failure 404 {string} string "User not found"
+// @Router /users/{id} [delete]
 func deleteUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
@@ -241,12 +287,20 @@ func deleteUser(db *sql.DB) http.HandlerFunc {
 }
 
 // log user in
+// @Summary Log in a user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body UserPayload true "User payload"
+// @Success 200 {object} LoginResponse
+// @Failure 401 {string} string "Unauthorized"
+// @Router /users/login [post]
 func logIn(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var up UserPayload
 		json.NewDecoder(r.Body).Decode(&up)
 		pwHash, _ := HashPassword(up.Password)
-		
+
 		var u UserDB
 		err := db.QueryRow("SELECT * FROM users WHERE email = $1", up.Email).Scan(&u.ID, &u.Name, &u.Email, &u.PwHash)
 		if err != nil {
@@ -264,7 +318,7 @@ func logIn(db *sql.DB) http.HandlerFunc {
 		if err != nil {
 			fmt.Errorf("user %v unauthorized; error: %v", up.Email, err)
 			w.WriteHeader(http.StatusUnauthorized)
-		}		
+		}
 		resp := LoginResponse{User: up.User, Token: tokenString}
 		fmt.Printf("user %v authorized\n", up.Email)
 		json.NewEncoder(w).Encode(resp)
